@@ -1,0 +1,101 @@
+function splitProcessSteps() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = selectSheet();
+  if (!sheet) return; // Exit if sheet selection is cancelled or invalid
+  
+  var startingCell = promptForStartingCell();
+  if (!startingCell) return; // Exit if starting cell input is cancelled or invalid
+  
+  var columnLetter = promptForColumnLetter();
+  if (!columnLetter) return; // Exit if column letter input is cancelled or invalid
+
+  var columnNumber = columnLetterToColumnNumber(columnLetter);
+  if (columnNumber === null) {
+    SpreadsheetApp.getUi().alert('Invalid column letter. Please try again.');
+    return;
+  }
+
+  var startRow = startingCell.getRow();
+  var lastRow = sheet.getLastRow();
+  var processStepsColumn = startingCell.getColumn();
+
+  var dataValues = sheet.getRange(startRow, 1, lastRow - startRow + 1, sheet.getLastColumn()).getValues();
+
+  var output = [];
+  // Loop through the rows
+  for (var i = 0; i < dataValues.length; i++) {
+    var row = dataValues[i];
+    if (row[processStepsColumn - 1] !== '') { // Check if the process steps column is not empty
+      var processSteps = row[processStepsColumn - 1].toString().split('","'); // Split the steps
+      for (var j = 0; j < processSteps.length; j++) {
+        var step = processSteps[j].replace(/^"|"$/g, ''); // Clean the quotes
+        var newRow = row.slice();
+        newRow[processStepsColumn - 1] = step;
+        output.push(newRow);
+      }
+    }
+  }
+
+  // Add the new rows to the sheet
+  sheet.insertRowsAfter(startRow, output.length - 1);
+  var outputRange = sheet.getRange(startRow, 1, output.length, sheet.getLastColumn());
+  outputRange.setValues(output);
+}
+
+function selectSheet() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = spreadsheet.getSheets();
+  var sheetNames = sheets.map(function(sheet) {
+    return sheet.getName();
+  });
+
+  var ui = SpreadsheetApp.getUi();
+  var sheetResponse = ui.prompt(
+    'Enter the number of the sheet you want to use:\n' +
+    sheetNames.map(function(name, index) {
+      return (index + 1) + ': ' + name;
+    }).join('\n')
+  );
+
+  var sheetNumber = parseInt(sheetResponse.getResponseText()) - 1;
+  if (sheetNumber >= 0 && sheetNumber < sheets.length) {
+    return sheets[sheetNumber];
+  }
+  ui.alert('Invalid sheet number. Please try again.');
+  return null;
+}
+
+function promptForStartingCell() {
+  var ui = SpreadsheetApp.getUi();
+  var rangeResponse = ui.prompt('Enter the starting cell address for the data to split (e.g., A2):');
+  var startingCellAddress = rangeResponse.getResponseText();
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var range = sheet.getRange(startingCellAddress);
+  if (range) {
+    return range;
+  }
+  ui.alert('Invalid cell address. Please try again.');
+  return null;
+}
+
+function promptForColumnLetter() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.prompt('Enter the column letter you want to copy data from:');
+  return response.getResponseText().trim();
+}
+
+function columnLetterToColumnNumber(columnLetter) {
+  var columnNumber = SpreadsheetApp.getActiveSheet().getRange(columnLetter + '1').getColumn();
+  if (columnNumber) {
+    return columnNumber;
+  }
+  return null;
+}
+
+// Function to create a custom menu
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('Custom Scripts')
+      .addItem('Split Process Steps', 'splitProcessSteps')
+      .addToUi();
+}
