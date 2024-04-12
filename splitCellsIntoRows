@@ -1,0 +1,81 @@
+function splitCellsIntoRows() {
+  var ui = SpreadsheetApp.getUi(); // Get the UI environment for prompting
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var sheetNames = sheets.map(function(sheet) { return sheet.getName(); });
+  var sheet;
+
+  // Check if there's more than one sheet and prompt for selection if true
+  if (sheets.length > 1) {
+    var responseSheet = ui.prompt("Enter the name of the sheet you want to use (" + sheetNames.join(", ") + "):");
+    sheet = ss.getSheetByName(responseSheet.getResponseText());
+    if (!sheet) {
+      ui.alert("Sheet not found. Please make sure you enter the correct sheet name.");
+      return;
+    }
+  } else {
+    sheet = ss.getActiveSheet();
+  }
+
+  // Prompt for the starting cell
+  var responseStartCell = ui.prompt("Enter the starting cell (e.g., 'L2') for processing:");
+  var startCell = responseStartCell.getResponseText();
+
+  // Ask if there is text to remove
+  var responseRemoveText = ui.alert('Do you need to remove any specific text?', ui.ButtonSet.YES_NO);
+
+  var charactersToRemove = [];
+  if (responseRemoveText == ui.Button.YES) {
+    // Prompt for characters to remove
+    var responseChars = ui.prompt("Enter each character or string to remove on a new line:");
+    charactersToRemove = responseChars.getResponseText().split('\n');
+  }
+  
+  // Prompt for delimiter
+  var responseDelimiter = ui.prompt("Enter the delimiter used for splitting entries (e.g., ','):");
+  var delimiter = responseDelimiter.getResponseText();
+
+  var cell = sheet.getRange(startCell);
+  var data = [];
+  var row = cell.getRow();
+  var totalRows = 0;
+  var totalSplits = 0;
+
+  // Loop through each row in the specified column until an empty cell is found
+  while (cell.offset(totalRows, 0).getValue() != "") {
+    var values = cell.offset(totalRows, 0).getValue();
+    
+    // Remove specified characters, if any
+    charactersToRemove.forEach(function(char) {
+      values = values.replace(new RegExp("\\" + char, "g"), "");
+    });
+
+    values = values.split(delimiter);
+    totalSplits += values.length;
+
+    for (var i = 0; i < values.length; i++) {
+      data.push([values[i].trim()]);
+    }
+    
+    totalRows++;
+  }
+  
+  var estimatedTime = (totalSplits / 10).toFixed(2); // Assuming each split takes around 0.1 seconds
+  
+  // Display summary and ask for user confirmation
+  var confirmation = ui.alert("Review the task summary",
+    "Total rows to process: " + totalRows + "\n" +
+    "Total splits: " + totalSplits + "\n" +
+    "Estimated time to completion: " + estimatedTime + " seconds.\n\n" +
+    "Do you want to proceed with the formatting?", ui.ButtonSet.YES_NO);
+
+  if (confirmation == ui.Button.YES) {
+    if (data.length > 0) {
+      sheet.getRange(startCell + ":" + sheet.getRange(startCell).offset(data.length - 1, 0).getA1Notation()).clearContent();
+      sheet.getRange(startCell + ":" + sheet.getRange(startCell).offset(data.length - 1, 0).getA1Notation()).setValues(data);
+    }
+    ui.alert("Data formatting complete!");
+  } else {
+    ui.alert("Data formatting aborted.");
+  }
+}
